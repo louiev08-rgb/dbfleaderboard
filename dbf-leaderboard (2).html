@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DBF Athlete Leaderboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #ff6600;
+      --primary-light: #ff8c00;
+      --accent: #ffa500;
+      --gold: #ffc107;
+      --dark: #1a1a1a;
+      --darker: #0d0d0d;
+      --text: #ffffff;
+      --text-dim: #b0b0b0;
+      --border: #333333;
+      --red-rank: #c62828;
+      --blue-rank: #1565c0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Roboto Mono', monospace;
+      background: var(--darker);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .bg-pattern {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: 
+        radial-gradient(circle at 20% 50%, rgba(255, 102, 0, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 50%, rgba(255, 165, 0, 0.03) 0%, transparent 50%),
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255, 255, 255, 0.015) 2px, rgba(255, 255, 255, 0.015) 4px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bg-pattern::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: 
+        radial-gradient(circle, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 20px 20px;
+      opacity: 0.5;
+    }
+
+    .container {
+      position: relative;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      z-index: 1;
+    }
+
+    .header {
+      text-align: center;
+      padding: 40px 20px;
+      position: relative;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 300px;
+      height: 200px;
+      background: radial-gradient(circle, var(--primary) 0%, var(--accent) 50%, transparent 70%);
+      opacity: 0.15;
+      filter: blur(60px);
+    }
+
+    h1 {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2.5rem, 7vw, 5rem);
+      letter-spacing: 0.08em;
+      color: var(--text);
+      text-shadow: 
+        0 0 30px rgba(255, 102, 0, 0.6),
+        0 2px 4px rgba(0, 0, 0, 0.8);
+      position: relative;
+      animation: glow 3s ease-in-out infinite alternate;
+      margin-bottom: 5px;
+    }
+
+    @keyframes glow {
+      from { text-shadow: 0 0 30px rgba(255, 102, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8); }
+      to { text-shadow: 0 0 50px rgba(255, 165, 0, 0.9), 0 2px 8px rgba(0, 0, 0, 0.9); }
+    }
+
+    .subtitle {
+      font-size: 0.85rem;
+      color: var(--accent);
+      letter-spacing: 0.25em;
+      margin-top: 5px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .auth-section, .app-section {
+      background: var(--dark);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 30px;
+      margin: 20px 0;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--darker);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+      font-family: 'Roboto Mono', monospace;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0, 245, 255, 0.1);
+    }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.2rem;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(255, 102, 0, 0.3);
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.6s, height 0.6s;
+    }
+
+    .btn:hover::before {
+      width: 300px;
+      height: 300px;
+    }
+
+    .btn:hover {
+      background: linear-gradient(135deg, var(--primary-light) 0%, var(--accent) 100%);
+      box-shadow: 0 6px 25px rgba(255, 102, 0, 0.5);
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid var(--primary);
+      color: var(--primary);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 102, 0, 0.15);
+      box-shadow: 0 5px 20px rgba(255, 102, 0, 0.3);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .user-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 15px;
+      background: var(--darker);
+      border-radius: 4px;
+      margin-bottom: 20px;
+      border-left: 3px solid var(--primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .user-info span {
+      font-size: 0.9rem;
+    }
+
+    .user-name {
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    .logout-btn {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.8rem;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 12px 24px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.9rem;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .tab.active {
+      color: var(--accent);
+    }
+
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+    }
+
+    .performance-form {
+      display: grid;
+      gap: 20px;
+    }
+
+    .time-input-group {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .leaderboard {
+      margin-top: 20px;
+    }
+
+    .leaderboard-header {
+      display: grid;
+      grid-template-columns: 50px 1fr 120px 100px;
+      gap: 15px;
+      padding: 15px;
+      background: var(--darker);
+      border-radius: 4px 4px 0 0;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+    }
+
+    .leaderboard-row {
+      display: grid;
+      grid-template-columns: 50px 1fr 120px 100px;
+      gap: 15px;
+      padding: 15px;
+      background: var(--dark);
+      border-bottom: 1px solid var(--border);
+      transition: all 0.3s ease;
+      animation: slideIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes slideIn {
+      to {
+        opacity: 1;
+      }
+    }
+
+    .leaderboard-row:hover {
+      background: rgba(255, 102, 0, 0.08);
+      transform: translateX(5px);
+      border-left: 3px solid var(--primary);
+    }
+
+    .rank {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.5rem;
+      color: var(--text);
+      font-weight: bold;
+    }
+
+    .rank.first {
+      color: var(--primary);
+      text-shadow: 0 0 10px rgba(255, 102, 0, 0.5);
+    }
+
+    .rank.second {
+      color: var(--red-rank);
+    }
+
+    .rank.third {
+      color: var(--blue-rank);
+    }
+
+    .athlete-name {
+      font-weight: bold;
+      color: var(--text);
+    }
+
+    .time {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.2rem;
+      color: var(--gold);
+      font-weight: bold;
+    }
+
+    .category {
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-dim);
+    }
+
+    .empty-state svg {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 20px;
+      opacity: 0.3;
+    }
+
+    .filter-section {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .filter-section select {
+      width: auto;
+      min-width: 150px;
+    }
+
+    .success-message {
+      padding: 15px;
+      background: rgba(255, 102, 0, 0.15);
+      border: 1px solid var(--primary);
+      border-radius: 4px;
+      color: var(--accent);
+      margin-bottom: 20px;
+      animation: fadeIn 0.5s ease;
+      font-weight: bold;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 3rem;
+      }
+
+      .leaderboard-header,
+      .leaderboard-row {
+        grid-template-columns: 40px 1fr 100px;
+        font-size: 0.85rem;
+      }
+
+      .category {
+        display: none;
+      }
+
+      .time-input-group {
+        grid-template-columns: 1fr;
+      }
+
+      .tabs {
+        overflow-x: auto;
+      }
+
+      .filter-section {
+        flex-direction: column;
+      }
+
+      .filter-section select {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-pattern"></div>
+  
+  <div class="container">
+    <div class="header">
+      <h1>DBF ATHLETE LEADERBOARD</h1>
+      <div class="subtitle">Performance Tracking System</div>
+    </div>
+
+    <!-- Authentication Section -->
+    <div id="authSection" class="auth-section">
+      <div class="input-group">
+        <label for="athleteName">Athlete Name</label>
+        <input type="text" id="athleteName" placeholder="Enter your name">
+      </div>
+      <div class="input-group">
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="Create or enter password">
+      </div>
+      <button class="btn" onclick="login()">Login / Register</button>
+    </div>
+
+    <!-- App Section -->
+    <div id="appSection" class="app-section hidden">
+      <div class="user-info">
+        <span>Logged in as: <span class="user-name" id="currentUser"></span></span>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab('log')">Log Performance</button>
+        <button class="tab" onclick="switchTab('leaderboard')">Leaderboard</button>
+      </div>
+
+      <!-- Log Performance Tab -->
+      <div id="logTab" class="tab-content">
+        <div id="successMessage" class="success-message hidden">
+          Performance logged successfully! 🏆
+        </div>
+
+        <form class="performance-form" onsubmit="logPerformance(event)">
+          <div class="input-group">
+            <label for="category">Event Type</label>
+            <select id="category" required>
+              <option value="">Select Event</option>
+              <optgroup label="DBF Events">
+                <option value="Melt 60">Melt 60</option>
+                <option value="Kickbox Cardio">Kickbox Cardio</option>
+                <option value="Spin Partly">Spin Partly</option>
+                <option value="BOX-E-RCISE">BOX-E-RCISE</option>
+              </optgroup>
+              <optgroup label="Hyrox Events">
+                <option value="Hyrox Open Men">Hyrox Open Men</option>
+                <option value="Hyrox Open Women">Hyrox Open Women</option>
+                <option value="Hyrox Pro Men">Hyrox Pro Men</option>
+                <option value="Hyrox Pro Women">Hyrox Pro Women</option>
+                <option value="Hyrox Doubles Men">Hyrox Doubles Men</option>
+                <option value="Hyrox Doubles Women">Hyrox Doubles Women</option>
+                <option value="Hyrox Doubles Mixed">Hyrox Doubles Mixed</option>
+                <option value="Hyrox Relay">Hyrox Relay</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Finish Time</label>
+            <div class="time-input-group">
+              <input type="number" id="hours" placeholder="Hours" min="0" max="5" value="0">
+              <input type="number" id="minutes" placeholder="Minutes" min="0" max="59" required>
+              <input type="number" id="seconds" placeholder="Seconds" min="0" max="59" required>
+            </div>
+          </div>
+
+          <div class="input-group">
+            <label for="eventDate">Event Date</label>
+            <input type="date" id="eventDate" required>
+          </div>
+
+          <div class="input-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" placeholder="e.g., Los Angeles, CA" required>
+          </div>
+
+          <button type="submit" class="btn">Submit Performance</button>
+        </form>
+      </div>
+
+      <!-- Leaderboard Tab -->
+      <div id="leaderboardTab" class="tab-content hidden">
+        <div class="filter-section">
+          <div class="input-group" style="margin: 0; flex: 1;">
+            <label for="filterCategory">Filter by Event</label>
+            <select id="filterCategory" onchange="loadLeaderboard()">
+              <option value="">All Events</option>
+              <optgroup label="DBF Events">
+                <option value="Melt 60">Melt 60</option>
+                <option value="Kickbox Cardio">Kickbox Cardio</option>
+                <option value="Spin Partly">Spin Partly</option>
+                <option value="BOX-E-RCISE">BOX-E-RCISE</option>
+              </optgroup>
+              <optgroup label="Hyrox Events">
+                <option value="Hyrox Open Men">Hyrox Open Men</option>
+                <option value="Hyrox Open Women">Hyrox Open Women</option>
+                <option value="Hyrox Pro Men">Hyrox Pro Men</option>
+                <option value="Hyrox Pro Women">Hyrox Pro Women</option>
+                <option value="Hyrox Doubles Men">Hyrox Doubles Men</option>
+                <option value="Hyrox Doubles Women">Hyrox Doubles Women</option>
+                <option value="Hyrox Doubles Mixed">Hyrox Doubles Mixed</option>
+                <option value="Hyrox Relay">Hyrox Relay</option>
+              </optgroup>
+            </select>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: flex-end;">
+            <button class="btn-secondary" style="padding: 12px 20px; width: auto; font-size: 0.9rem;" onclick="exportData()">📥 Export Data</button>
+            <button class="btn-secondary" style="padding: 12px 20px; width: auto; font-size: 0.9rem;" onclick="document.getElementById('importFile').click()">📤 Import Data</button>
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+          </div>
+        </div>
+
+        <div class="leaderboard">
+          <div class="leaderboard-header">
+            <div>Rank</div>
+            <div>Athlete</div>
+            <div>Time</div>
+            <div>Event</div>
+          </div>
+          <div id="leaderboardContent"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+
+    // Initialize
+    function init() {
+      const savedUser = localStorage.getItem('dbf_current_user');
+      if (savedUser) {
+        currentUser = savedUser;
+        showApp();
+        loadLeaderboard();
+      }
+      
+      // Set today's date as default
+      document.getElementById('eventDate').valueAsDate = new Date();
+    }
+
+    function login() {
+      const name = document.getElementById('athleteName').value.trim();
+      const password = document.getElementById('authPassword').value;
+
+      if (!name || !password) {
+        alert('Please enter both name and password');
+        return;
+      }
+
+      // Get users from localStorage
+      const usersData = localStorage.getItem('dbf_users');
+      const users = usersData ? JSON.parse(usersData) : {};
+
+      if (users[name]) {
+        // User exists, check password
+        if (users[name].password === password) {
+          currentUser = name;
+          localStorage.setItem('dbf_current_user', name);
+          showApp();
+          loadLeaderboard();
+        } else {
+          alert('Incorrect password');
+        }
+      } else {
+        // New user, register
+        users[name] = { password };
+        localStorage.setItem('dbf_users', JSON.stringify(users));
+        currentUser = name;
+        localStorage.setItem('dbf_current_user', name);
+        showApp();
+        loadLeaderboard();
+        alert(`Welcome ${name}! Your account has been created.`);
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      localStorage.removeItem('dbf_current_user');
+      document.getElementById('authSection').classList.remove('hidden');
+      document.getElementById('appSection').classList.add('hidden');
+      document.getElementById('athleteName').value = '';
+      document.getElementById('authPassword').value = '';
+    }
+
+    function showApp() {
+      document.getElementById('authSection').classList.add('hidden');
+      document.getElementById('appSection').classList.remove('hidden');
+      document.getElementById('currentUser').textContent = currentUser;
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+      if (tab === 'log') {
+        document.querySelectorAll('.tab')[0].classList.add('active');
+        document.getElementById('logTab').classList.remove('hidden');
+      } else {
+        document.querySelectorAll('.tab')[1].classList.add('active');
+        document.getElementById('leaderboardTab').classList.remove('hidden');
+        loadLeaderboard();
+      }
+    }
+
+    function logPerformance(event) {
+      event.preventDefault();
+
+      const category = document.getElementById('category').value;
+      const hours = parseInt(document.getElementById('hours').value) || 0;
+      const minutes = parseInt(document.getElementById('minutes').value);
+      const seconds = parseInt(document.getElementById('seconds').value);
+      const eventDate = document.getElementById('eventDate').value;
+      const location = document.getElementById('location').value;
+
+      const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+      const timeString = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+      const performance = {
+        athlete: currentUser,
+        category,
+        time: timeString,
+        totalSeconds,
+        date: eventDate,
+        location,
+        timestamp: Date.now()
+      };
+
+      // Get existing performances
+      const performancesData = localStorage.getItem('dbf_performances');
+      const performances = performancesData ? JSON.parse(performancesData) : [];
+      
+      // Add new performance
+      performances.push(performance);
+      localStorage.setItem('dbf_performances', JSON.stringify(performances));
+
+      // Show success message
+      const successMsg = document.getElementById('successMessage');
+      successMsg.classList.remove('hidden');
+      setTimeout(() => successMsg.classList.add('hidden'), 3000);
+
+      // Reset form
+      event.target.reset();
+      document.getElementById('hours').value = '0';
+      document.getElementById('eventDate').valueAsDate = new Date();
+
+      // Switch to leaderboard
+      setTimeout(() => switchTab('leaderboard'), 1500);
+    }
+
+    function loadLeaderboard() {
+      const filterCategory = document.getElementById('filterCategory').value;
+      const content = document.getElementById('leaderboardContent');
+
+      // Get performances from localStorage
+      const performancesData = localStorage.getItem('dbf_performances');
+      const performances = performancesData ? JSON.parse(performancesData) : [];
+
+      if (performances.length === 0) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <svg fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+              <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+            </svg>
+            <p>No performances logged yet.<br>Be the first to log your time!</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Filter by category if selected
+      let filtered = performances;
+      if (filterCategory) {
+        filtered = performances.filter(p => p.category === filterCategory);
+      }
+
+      // Sort by time
+      filtered.sort((a, b) => a.totalSeconds - b.totalSeconds);
+
+      if (filtered.length === 0) {
+        content.innerHTML = `
+          <div class="empty-state">
+            <p>No performances found for this event.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Render leaderboard
+      content.innerHTML = filtered.map((perf, index) => {
+        const rankClass = index === 0 ? 'first' : index === 1 ? 'second' : index === 2 ? 'third' : '';
+        return `
+          <div class="leaderboard-row" style="animation-delay: ${index * 0.05}s">
+            <div class="rank ${rankClass}">${index + 1}</div>
+            <div>
+              <div class="athlete-name">${perf.athlete}</div>
+              <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 4px;">
+                ${perf.location} • ${new Date(perf.date).toLocaleDateString()}
+              </div>
+            </div>
+            <div class="time">${perf.time}</div>
+            <div class="category">${perf.category}</div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function exportData() {
+      const performancesData = localStorage.getItem('dbf_performances');
+      const usersData = localStorage.getItem('dbf_users');
+      
+      const exportObj = {
+        performances: performancesData ? JSON.parse(performancesData) : [],
+        users: usersData ? JSON.parse(usersData) : {},
+        exportDate: new Date().toISOString(),
+        version: '1.0'
+      };
+
+      const dataStr = JSON.stringify(exportObj, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `dbf-leaderboard-backup-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      
+      alert('Data exported successfully! 📥');
+    }
+
+    function importData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const importObj = JSON.parse(e.target.result);
+          
+          if (importObj.performances) {
+            const existing = localStorage.getItem('dbf_performances');
+            const existingPerfs = existing ? JSON.parse(existing) : [];
+            const merged = [...existingPerfs, ...importObj.performances];
+            localStorage.setItem('dbf_performances', JSON.stringify(merged));
+          }
+          
+          if (importObj.users) {
+            const existing = localStorage.getItem('dbf_users');
+            const existingUsers = existing ? JSON.parse(existing) : {};
+            const merged = { ...existingUsers, ...importObj.users };
+            localStorage.setItem('dbf_users', JSON.stringify(merged));
+          }
+          
+          alert('Data imported successfully! 📤');
+          loadLeaderboard();
+        } catch (error) {
+          alert('Error importing data. Please check the file format.');
+          console.error('Import error:', error);
+        }
+      };
+      reader.readAsText(file);
+      
+      // Reset file input
+      event.target.value = '';
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
