@@ -1,0 +1,16 @@
+fastapi>=0.111
+uvicorn[standard]>=0.30
+SQLAlchemy>=2.0
+pydantic>=2.7
+pydantic[email]>=2.7
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+python-multipart>=0.0.9
+alembic>=1.13
+
+# production database driver (PostgreSQL); not needed for the SQLite demo
+psycopg[binary]>=3.1
+
+# dev / test
+pytest>=8.0
+httpx>=0.27

@@ -1,0 +1,35 @@
+# Production-style local stack: PostgreSQL + the API (TDS section 9).
+#   docker compose up --build
+# The API runs Alembic migrations on start, then serves on :8000.
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: petro
+      POSTGRES_PASSWORD: petro
+      POSTGRES_DB: petro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://petro:petro@db:5432/petro
+      JWT_SECRET: change-me-in-real-deployments
+      PSP_WEBHOOK_SECRET: psp-demo-secret
+      SEED_ON_STARTUP: "0"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

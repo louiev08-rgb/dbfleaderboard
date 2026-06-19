@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petro · Forecourt Console</title>
+<style>
+  /* ----------------------------------------------------------------------
+     Design system. Subject: a forecourt payment console that replaces the
+     bank speedpoint. Identity borrows from dispenser hardware — ink-slate
+     casing, a single signal-amber accent (forecourt signage), and a
+     mechanical monospace for the meter + money readouts.
+     ---------------------------------------------------------------------- */
+  :root{
+    --ink:#0e1419;          /* casing */
+    --ink-2:#161e26;        /* raised panel */
+    --ink-3:#1e2832;        /* control */
+    --line:#2a3742;         /* hairline */
+    --line-2:#37454f;
+    --text:#e6edf2;
+    --muted:#8597a3;
+    --muted-2:#5f7280;
+    --amber:#ffb020;        /* signal accent */
+    --amber-dim:#3a2d12;
+    --green:#34d399;
+    --green-dim:#10231c;
+    --red:#f87171;
+    --red-dim:#2a1417;
+    --blue:#5eb3f6;
+    --radius:10px;
+    --mono:"DM Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--sans);
+    font-size:14px;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--blue);text-decoration:none}
+  button{font-family:inherit}
+
+  /* shell ---------------------------------------------------------------- */
+  .app{display:none;grid-template-columns:230px 1fr;min-height:100vh}
+  .app.authed{display:grid}
+
+  .side{
+    background:var(--ink-2);
+    border-right:1px solid var(--line);
+    padding:20px 14px;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 8px 18px}
+  .brand .mark{width:34px;height:34px;flex:none}
+  .brand h1{font-size:15px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .brand .sub{font-size:11px;color:var(--muted-2);font-family:var(--mono);letter-spacing:.04em}
+
+  .nav-label{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted-2);
+    padding:14px 10px 6px;font-weight:600}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+    background:none;border:0;color:var(--muted);padding:9px 10px;border-radius:8px;
+    cursor:pointer;font-size:13.5px;font-weight:500;transition:background .12s,color .12s;
+  }
+  .nav-item:hover{background:var(--ink-3);color:var(--text)}
+  .nav-item.active{background:var(--amber-dim);color:var(--amber)}
+  .nav-item .ic{width:17px;height:17px;flex:none;opacity:.9}
+  .nav-spacer{flex:1}
+  .whoami{border-top:1px solid var(--line);padding-top:14px;margin-top:6px}
+  .whoami .role{font-size:11px;color:var(--amber);font-family:var(--mono);text-transform:uppercase;letter-spacing:.06em}
+  .whoami .who{font-size:13px;color:var(--text);margin:2px 0 8px;word-break:break-all}
+
+  .main{padding:26px 30px 60px;overflow-x:hidden}
+  .head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px;gap:16px;flex-wrap:wrap}
+  .head h2{margin:0;font-size:22px;font-weight:700;letter-spacing:-.02em}
+  .head .desc{color:var(--muted);font-size:13px;margin-top:3px;max-width:60ch}
+  .eyebrow{font-family:var(--mono);font-size:11px;color:var(--amber);letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+
+  /* primitives ----------------------------------------------------------- */
+  .btn{
+    background:var(--ink-3);color:var(--text);border:1px solid var(--line-2);
+    padding:9px 15px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;
+    transition:border-color .12s,background .12s,transform .04s;
+  }
+  .btn:hover{border-color:var(--muted-2)}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--amber);color:#1a1206;border-color:var(--amber)}
+  .btn.primary:hover{background:#ffbf42}
+  .btn.ghost{background:transparent}
+  .btn.danger{border-color:#5a2730;color:var(--red)}
+  .btn.sm{padding:6px 11px;font-size:12px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+
+  .card{background:var(--ink-2);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+  .grid{display:grid;gap:16px}
+  .grid.cols-2{grid-template-columns:1fr 1fr}
+  .grid.cols-3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:900px){.grid.cols-2,.grid.cols-3{grid-template-columns:1fr}.app.authed{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap;align-items:center}.nav-spacer,.nav-label{display:none}}
+
+  label.fld{display:block;margin-bottom:12px}
+  label.fld span{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
+  input,select{
+    width:100%;background:var(--ink);border:1px solid var(--line-2);color:var(--text);
+    padding:9px 11px;border-radius:8px;font-size:13.5px;font-family:inherit;outline:none;
+  }
+  input:focus,select:focus{border-color:var(--amber)}
+  input.mono{font-family:var(--mono)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);
+    font-weight:600;padding:9px 12px;border-bottom:1px solid var(--line)}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);color:var(--text)}
+  tr:last-child td{border-bottom:0}
+  td.num,th.num{font-family:var(--mono);text-align:right}
+
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;
+    padding:3px 8px;border-radius:999px;text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+  .pill.ok{background:var(--green-dim);color:var(--green)}
+  .pill.warn{background:var(--amber-dim);color:var(--amber)}
+  .pill.bad{background:var(--red-dim);color:var(--red)}
+  .pill.neutral{background:var(--ink-3);color:var(--muted)}
+
+  /* login ---------------------------------------------------------------- */
+  .login-wrap{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+  .login-card{width:380px;max-width:100%;background:var(--ink-2);border:1px solid var(--line);
+    border-radius:14px;padding:30px}
+  .login-card .brand{padding:0 0 22px}
+  .login-card h2{margin:0 0 4px;font-size:18px}
+  .login-card p.lead{color:var(--muted);font-size:13px;margin:0 0 22px}
+  .quick{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+  .quick .nav-label{padding:0 0 8px}
+  .quick-row{display:flex;gap:7px;flex-wrap:wrap}
+  .quick-row button{flex:1;min-width:96px;background:var(--ink-3);border:1px solid var(--line-2);
+    color:var(--muted);border-radius:8px;padding:8px 6px;font-size:11.5px;cursor:pointer;transition:.12s}
+  .quick-row button:hover{border-color:var(--amber);color:var(--amber)}
+
+  /* dispenser meter — the signature element ------------------------------ */
+  .meter{background:var(--ink);border:1px solid var(--line-2);border-radius:12px;padding:20px;position:relative;overflow:hidden}
+  .meter .read{font-family:var(--mono);font-size:46px;font-weight:500;letter-spacing:-.01em;line-height:1}
+  .meter .read .u{font-size:20px;color:var(--muted);margin-left:8px}
+  .meter .sub{display:flex;justify-content:space-between;color:var(--muted);font-family:var(--mono);font-size:12px;margin-top:8px}
+  .gauge{height:10px;background:var(--ink-3);border-radius:999px;margin:16px 0 4px;overflow:hidden;border:1px solid var(--line)}
+  .gauge .fill{height:100%;width:0;background:linear-gradient(90deg,var(--amber),#ffd071);
+    box-shadow:0 0 16px rgba(255,176,32,.45);transition:width .4s ease}
+  .money-read{font-family:var(--mono);font-size:30px;font-weight:500;margin-top:14px}
+  .money-read .cur{font-size:15px;color:var(--muted);margin-right:4px}
+
+  .stat{background:var(--ink-2);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-2);font-weight:600}
+  .stat .v{font-family:var(--mono);font-size:26px;margin-top:6px}
+  .stat .v.amber{color:var(--amber)}
+
+  .empty{color:var(--muted-2);text-align:center;padding:30px 16px;font-size:13px}
+  .toast{position:fixed;bottom:22px;right:22px;background:var(--ink-3);border:1px solid var(--line-2);
+    border-left:3px solid var(--amber);padding:13px 16px;border-radius:9px;max-width:340px;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);font-size:13px;opacity:0;transform:translateY(8px);
+    transition:.2s;z-index:50}
+  .toast.show{opacity:1;transform:none}
+  .toast.ok{border-left-color:var(--green)}
+  .toast.err{border-left-color:var(--red)}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .spacer{flex:1}
+  .hint{font-size:12px;color:var(--muted-2);margin-top:4px}
+  .seg{display:inline-flex;background:var(--ink);border:1px solid var(--line-2);border-radius:8px;padding:3px;gap:3px}
+  .seg button{background:none;border:0;color:var(--muted);padding:6px 13px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600}
+  .seg button.on{background:var(--amber-dim);color:var(--amber)}
+  code.k{font-family:var(--mono);background:var(--ink);border:1px solid var(--line);padding:1px 6px;border-radius:5px;font-size:12px;color:var(--amber)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login">
+  <div class="login-card">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="5" width="20" height="30" rx="3" fill="#1e2832" stroke="#ffb020" stroke-width="1.6"/>
+        <rect x="8" y="9" width="12" height="7" rx="1.5" fill="#ffb020"/>
+        <rect x="8" y="20" width="12" height="3" rx="1.5" fill="#37454f"/>
+        <rect x="8" y="26" width="9" height="3" rx="1.5" fill="#37454f"/>
+        <path d="M24 14h4l5 5v11a3 3 0 0 1-6 0v-6h-3" stroke="#ffb020" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+        <circle cx="33" cy="13" r="2" fill="#34d399"/>
+      </svg>
+      <div>
+        <h1>Petro Console</h1>
+        <div class="sub">FORECOURT · PHONE-PAYS</div>
+      </div>
+    </div>
+    <h2>Sign in</h2>
+    <p class="lead">Operate sessions, payments, and settlement for your forecourt.</p>
+    <label class="fld"><span>Email</span><input id="email" type="email" autocomplete="username" placeholder="attendant@acme.example"></label>
+    <label class="fld"><span>Password</span><input id="password" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+    <button class="btn primary" style="width:100%" onclick="doLogin()">Sign in</button>
+    <div class="quick">
+      <div class="nav-label">Demo accounts · password123</div>
+      <div class="quick-row" id="quickAccts"></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app" id="app">
+  <aside class="side">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="5" width="20" height="30" rx="3" fill="#1e2832" stroke="#ffb020" stroke-width="1.6"/>
+        <rect x="8" y="9" width="12" height="7" rx="1.5" fill="#ffb020"/>
+        <rect x="8" y="20" width="12" height="3" rx="1.5" fill="#37454f"/>
+        <rect x="8" y="26" width="9" height="3" rx="1.5" fill="#37454f"/>
+        <path d="M24 14h4l5 5v11a3 3 0 0 1-6 0v-6h-3" stroke="#ffb020" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+        <circle cx="33" cy="13" r="2" fill="#34d399"/>
+      </svg>
+      <div><h1>Petro Console</h1><div class="sub">FORECOURT · PHONE-PAYS</div></div>
+    </div>
+    <div class="nav-label">Operate</div>
+    <nav id="nav"></nav>
+    <div class="nav-spacer"></div>
+    <div class="whoami">
+      <div class="role" id="meRole">—</div>
+      <div class="who" id="meWho">—</div>
+      <button class="btn ghost sm" style="width:100%" onclick="logout()">Sign out</button>
+    </div>
+  </aside>
+  <main class="main" id="view"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================ API client */
+const API = (location.search.match(/api=([^&]+)/) || [])[1]
+  ? decodeURIComponent(location.search.match(/api=([^&]+)/)[1])
+  : ""; // same origin by default (served by FastAPI)
+
+const state = { token:null, role:null, email:null };
+
+async function api(path, {method="GET", body=null, form=false, raw=false}={}){
+  const headers = {};
+  if(state.token) headers["Authorization"] = "Bearer "+state.token;
+  let payload = null;
+  if(form){ headers["Content-Type"]="application/x-www-form-urlencoded"; payload=new URLSearchParams(body).toString(); }
+  else if(body!=null){ headers["Content-Type"]="application/json"; payload=JSON.stringify(body); }
+  const res = await fetch(API+path, {method, headers, body:payload});
+  if(res.status===204) return null;
+  const txt = await res.text();
+  let data; try{ data=txt?JSON.parse(txt):null; }catch{ data=txt; }
+  if(!res.ok){ throw new Error((data && data.detail) ? data.detail : ("HTTP "+res.status)); }
+  return data;
+}
+
+/* ============================================================ helpers */
+const $ = s => document.querySelector(s);
+const el = (t,a={},...kids)=>{const e=document.createElement(t);
+  for(const k in a){ if(k==="class")e.className=a[k]; else if(k==="html")e.innerHTML=a[k]; else if(k.startsWith("on"))e.addEventListener(k.slice(2),a[k]); else e.setAttribute(k,a[k]); }
+  kids.flat().forEach(c=>e.appendChild(typeof c==="string"?document.createTextNode(c):c)); return e;};
+const money = n => "R"+Number(n).toFixed(2);
+let toastT;
+function toast(msg, kind=""){ const t=$("#toast"); t.textContent=msg; t.className="toast show "+kind;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.className="toast",3200); }
+function statePill(s){
+  const map={ok:["ok","OK"],active:["ok","ACTIVE"],completed:["ok","COMPLETED"],captured:["ok","CAPTURED"],
+    settled:["ok","SETTLED"],authorised:["warn","AUTHORISED"],created:["neutral","CREATED"],
+    dispensing:["warn","DISPENSING"],paused:["neutral","PAUSED"],pending:["warn","PENDING"],
+    reconciled:["ok","RECONCILED"],stolen:["bad","STOLEN"],refused:["bad","REFUSED"],
+    declined:["bad","DECLINED"],failed:["bad","FAILED"],voided:["neutral","VOIDED"],
+    refunded:["neutral","REFUNDED"],suspended:["bad","SUSPENDED"]};
+  const [c,label]=map[String(s).toLowerCase()]||["neutral",String(s).toUpperCase()];
+  return `<span class="pill ${c}">${label}</span>`;
+}
+
+/* ============================================================ nav model
+   Tabs are filtered by role so each principal sees only what they can do. */
+const TABS = [
+  {id:"overview", label:"Overview", roles:"*", icon:'M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z'},
+  {id:"session",  label:"Run a session", roles:["station_operator","forecourt_manager"], icon:'M13 2 3 14h7l-1 8 10-12h-7l1-8Z'},
+  {id:"pay",      label:"My wallet & pay", roles:["customer"], icon:'M3 7h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm0-2 2-2h14l2 2M16 13h2'},
+  {id:"vehicles", label:"Vehicles", roles:["retailer_admin","forecourt_manager","station_operator"], icon:'M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11m-14 0h14v5H5v-5Zm2 5v2m10-2v2M7.5 14h.01M16.5 14h.01'},
+  {id:"logbook",  label:"Logbook", roles:["station_operator","forecourt_manager","retailer_admin","finance_audit"], icon:'M5 4h14v16H5zM8 8h8M8 12h8M8 16h5'},
+  {id:"settlement",label:"Settlement", roles:["finance_audit","retailer_admin"], icon:'M12 1v22M5 5h9a3 3 0 0 1 0 6H7a3 3 0 0 0 0 6h10'},
+  {id:"tenancy",  label:"Retailers & pumps", roles:["platform_admin","retailer_admin","forecourt_manager"], icon:'M3 21V8l9-5 9 5v13M9 21v-6h6v6M3 21h18'},
+];
+function visibleTabs(){ return TABS.filter(t=>t.roles==="*"||t.roles.includes(state.role)); }
+
+/* ============================================================ auth */
+const DEMO = [
+  ["Attendant","attendant@acme.example"],["Customer","driver@example.com"],
+  ["Manager","manager@acme.example"],["Retailer","retailer@acme.example"],
+  ["Finance","finance@acme.example"],["Admin","admin@petro.example"],
+];
+function renderQuick(){ const w=$("#quickAccts"); w.innerHTML="";
+  DEMO.forEach(([label,email])=>w.appendChild(el("button",{onclick:()=>{$("#email").value=email;$("#password").value="password123";}},label))); }
+
+async function doLogin(){
+  const email=$("#email").value.trim(), password=$("#password").value;
+  if(!email||!password){ toast("Enter email and password","err"); return; }
+  try{
+    const r = await api("/auth/token",{method:"POST",form:true,body:{username:email,password}});
+    state.token=r.access_token; state.role=r.role; state.email=email;
+    sessionStorage.setItem("petro",JSON.stringify(state));
+    enterApp();
+  }catch(e){ toast(e.message,"err"); }
+}
+function logout(){ Object.assign(state,{token:null,role:null,email:null}); sessionStorage.removeItem("petro");
+  $("#app").classList.remove("authed"); $("#login").style.display="flex"; }
+
+function enterApp(){
+  $("#login").style.display="none";
+  $("#app").classList.add("authed");
+  $("#meRole").textContent=state.role.replace(/_/g," ");
+  $("#meWho").textContent=state.email;
+  const nav=$("#nav"); nav.innerHTML="";
+  visibleTabs().forEach(t=>{
+    nav.appendChild(el("button",{class:"nav-item",id:"nav-"+t.id,onclick:()=>go(t.id)},
+      el("svg",{class:"ic",viewBox:"0 0 24 24",fill:"none",stroke:"currentColor","stroke-width":"1.8","stroke-linecap":"round","stroke-linejoin":"round",html:`<path d="${t.icon}"/>`}),
+      t.label));
+  });
+  go(visibleTabs()[0].id);
+}
+function go(id){
+  document.querySelectorAll(".nav-item").forEach(n=>n.classList.toggle("active",n.id==="nav-"+id));
+  VIEWS[id] ? VIEWS[id]() : (VIEWS.overview());
+}
+
+/* ============================================================ views */
+const VIEWS = {};
+function header(eyebrow,title,desc,actions){
+  const h=el("div",{class:"head"},
+    el("div",{},el("div",{class:"eyebrow"},eyebrow),el("h2",{},title),desc?el("div",{class:"desc"},desc):""),
+    actions?el("div",{class:"row"},...actions):"");
+  return h;
+}
+function setView(...nodes){ const v=$("#view"); v.innerHTML=""; nodes.forEach(n=>v.appendChild(n)); }
+
+/* ---- Overview -------------------------------------------------------- */
+VIEWS.overview = async function(){
+  setView(header("Forecourt","Overview",
+    "The phone replaces the bank speedpoint: an attendant starts the pump, the customer pays from their phone on a card held on file."));
+  const wrap = el("div",{class:"grid cols-3"});
+  $("#view").appendChild(wrap);
+  // pull a few read-only stats the role is allowed to see
+  let logs=[], settlements=[];
+  try{ logs = await api("/logbook"); }catch{}
+  try{ settlements = await api("/settlements"); }catch{}
+  const captured = logs.filter(l=>l.payment_outcome==="captured");
+  const totalToday = captured.reduce((s,l)=>s+Number(l.total),0);
+  wrap.appendChild(stat("Completed transactions", logs.length, false));
+  wrap.appendChild(stat("Captured value", money(totalToday), true));
+  wrap.appendChild(stat("Settlement rows", settlements.length, false));
+
+  if(state.role==="customer"){
+    setView(header("Customer","Pay for fuel from your phone",
+      "Add a card once — it's tokenised by the payment provider, never stored as a card number — then pay for the exact litres dispensed."));
+    $("#view").appendChild(el("div",{class:"card"},
+      el("p",{html:"Open <b>My wallet & pay</b> to manage your card and authorise a fuelling session.",style:"margin:0;color:var(--muted)"})));
+    return;
+  }
+  $("#view").appendChild(el("div",{class:"card",style:"margin-top:16px"},
+    el("div",{class:"eyebrow"},"How a sale flows"),
+    el("p",{style:"margin:6px 0 0;color:var(--muted)",html:
+      "1 · Attendant opens a session on a pump &nbsp;→&nbsp; 2 · Customer pre-authorises their card &nbsp;→&nbsp; 3 · Pump dispenses (signed POS events) &nbsp;→&nbsp; 4 · Platform captures the exact dispensed amount and issues a digital receipt."})));
+};
+function stat(k,v,amber){ return el("div",{class:"stat"},el("div",{class:"k"},k),el("div",{class:"v"+(amber?" amber":"")},String(v))); }
+
+/* ---- Run a session (attendant) -------------------------------------- */
+let SESSION = null, POLL = null;
+VIEWS.session = async function(){
+  setView(header("Operate","Run a session",
+    "Open a pump for a vehicle, let the customer authorise payment, then simulate the pump dispensing fuel."));
+  const v=$("#view");
+
+  // setup panel
+  const pumps = await safe(()=>api("/pumps?all=1"), null); // not an endpoint; we list via tenancy below
+  const vehicles = await safe(()=>api("/vehicles"), []);
+  const setup = el("div",{class:"card"});
+  setup.appendChild(el("div",{class:"eyebrow"},"1 · Open session"));
+  const pumpInput = el("input",{class:"mono",type:"number",value:"1",min:"1"});
+  const vehSel = el("select",{});
+  vehSel.appendChild(el("option",{value:""},"— no vehicle —"));
+  (vehicles||[]).forEach(x=>vehSel.appendChild(el("option",{value:x.id},`${x.plate} · ${x.nickname||""} ${x.flag==="stolen"?"⚠ STOLEN":""}`)));
+  const custInput = el("input",{class:"mono",type:"number",placeholder:"customer id (optional)",value:"1"});
+  const modeSeg = seg(["fuel","ev"],"fuel");
+  const target = el("input",{class:"mono",type:"number",value:"20",step:"0.01"});
+  const price = el("input",{class:"mono",type:"number",value:"23.50",step:"0.01"});
+  setup.appendChild(grid2(
+    fld("Pump ID",pumpInput), fld("Vehicle",vehSel),
+    fld("Customer ID",custInput), fld("Mode",modeSeg.node),
+    fld("Target (units)",target), fld("Price / unit (R)",price)));
+  const openBtn = el("button",{class:"btn primary",onclick:async()=>{
+    try{
+      const body={pump_id:+pumpInput.value, vehicle_id:vehSel.value?+vehSel.value:null,
+        customer_id:custInput.value?+custInput.value:null, mode:modeSeg.value(),
+        target:String(target.value), price_per_unit:String(price.value)};
+      SESSION = await api("/sessions",{method:"POST",body});
+      toast("Session "+SESSION.session_ref+" opened","ok");
+      VIEWS.session();
+    }catch(e){ toast(e.message,"err"); }
+  }},"Open session");
+  setup.appendChild(el("div",{class:"row",style:"margin-top:6px"},openBtn,
+    el("span",{class:"hint"},"A stolen-flagged vehicle is refused here.")));
+  v.appendChild(setup);
+
+  if(!SESSION){ return; }
+
+  // live session panel with the dispenser meter (signature element)
+  const refRow = el("div",{class:"row",style:"margin:18px 0 12px"},
+    el("div",{class:"eyebrow",style:"margin:0"},"Live session"),
+    el("code",{class:"k"},SESSION.session_ref),
+    el("span",{html:statePill(SESSION.state)}), el("div",{class:"spacer"}),
+    el("button",{class:"btn ghost sm",onclick:()=>{SESSION=null;clearInterval(POLL);VIEWS.session();}},"Clear"));
+  v.appendChild(refRow);
+
+  const cols = el("div",{class:"grid cols-2"});
+  v.appendChild(cols);
+
+  // meter
+  const dispensed = Number(SESSION.dispensed||0), tgt=Number(SESSION.target||0);
+  const pct = tgt>0?Math.min(100,dispensed/tgt*100):0;
+  const unit = SESSION.mode==="ev"?"kWh":"L";
+  const bill = (Number(SESSION.price_per_unit)*dispensed);
+  const meter = el("div",{class:"meter"},
+    el("div",{class:"read",html:`${dispensed.toFixed(2)}<span class="u">${unit}</span>`}),
+    el("div",{class:"gauge"},el("div",{class:"fill",style:`width:${pct}%`})),
+    el("div",{class:"sub"},el("span",{},`target ${tgt.toFixed(2)} ${unit}`),el("span",{},`${pct.toFixed(0)}%`)),
+    el("div",{class:"money-read",html:`<span class="cur">R</span>${bill.toFixed(2)}`}),
+    el("div",{class:"hint"},"Billed only for units actually dispensed."));
+  cols.appendChild(meter);
+
+  // payment + pump controls
+  const ctl = el("div",{class:"card"});
+  ctl.appendChild(el("div",{class:"eyebrow"},"2 · Authorise &nbsp;·&nbsp; 3 · Dispense"));
+  if(!SESSION.payment_id){
+    ctl.appendChild(el("p",{class:"hint",style:"margin:8px 0"},
+      "Waiting for the customer to pre-authorise. For the demo, authorise here with a method id."));
+    const mid = el("input",{class:"mono",type:"number",value:"1",placeholder:"payment method id"});
+    ctl.appendChild(fld("Payment method id",mid));
+    ctl.appendChild(el("button",{class:"btn",onclick:async()=>{
+      try{ await api(`/sessions/${SESSION.id}/authorise`,{method:"POST",body:{method_id:+mid.value}});
+        SESSION = await refreshSession(); toast("Pre-authorised","ok"); VIEWS.session();
+      }catch(e){ toast(e.message,"err"); } }},"Pre-authorise card"));
+  } else {
+    ctl.appendChild(el("p",{class:"hint",style:"margin:8px 0"},"Authorised. Simulate the pump POS sending signed dispense events."));
+    const amt = el("input",{class:"mono",type:"number",value:"5",step:"0.01"});
+    ctl.appendChild(fld("Dispense now (units)",amt));
+    ctl.appendChild(el("div",{class:"row"},
+      el("button",{class:"btn",onclick:()=>pumpTick(+amt.value,false)},"Dispense tick"),
+      el("button",{class:"btn primary",onclick:()=>pumpTick(+amt.value,true)},"Dispense & complete")));
+    ctl.appendChild(el("p",{class:"hint",style:"margin-top:10px"},
+      "Events are HMAC-signed with the pump secret on the server side of this demo console."));
+  }
+  cols.appendChild(ctl);
+};
+async function refreshSession(){ const all=await api("/logbook").catch(()=>[]); // not by id; re-fetch via sessions not exposed list
+  return SESSION; }
+async function pumpTick(units, complete){
+  // The browser cannot hold the pump secret; the console asks the backend demo
+  // helper to sign + post. We call a thin proxy endpoint if present, else inform.
+  try{
+    const body={session_ref:SESSION.session_ref, units:String(units), complete:!!complete};
+    const r = await api("/demo/pump-dispense",{method:"POST",body});
+    SESSION = r; toast(complete?"Dispense complete — captured":"Dispensed "+units,"ok"); VIEWS.session();
+  }catch(e){ toast("Pump event failed: "+e.message,"err"); }
+}
+
+/* ---- Customer wallet & pay ------------------------------------------ */
+VIEWS.pay = async function(){
+  setView(header("Customer","My wallet & pay",
+    "Your card is tokenised by the payment provider — Petro stores only a token and a masked display, never the card number."));
+  const v=$("#view");
+  const methods = await safe(()=>api("/customers/payment-methods"), []);
+  const card = el("div",{class:"card"});
+  card.appendChild(el("div",{class:"eyebrow"},"Cards on file"));
+  if(methods.length){
+    const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},
+      el("th",{},"Card"),el("th",{},"Type"),el("th",{},"Default"),el("th",{},""))));
+    const tb=el("tbody",{});
+    methods.forEach(m=>tb.appendChild(el("tr",{},
+      el("td",{class:"num"},m.card_mask||"—"),el("td",{},m.type),
+      el("td",{html:m.is_default?statePill("ok"):'<span class="pill neutral">—</span>'}),
+      el("td",{},el("button",{class:"btn danger sm",onclick:async()=>{
+        try{await api("/customers/payment-methods/"+m.id,{method:"DELETE"});toast("Card removed","ok");VIEWS.pay();}catch(e){toast(e.message,"err");}
+      }},"Remove")))));
+    t.appendChild(tb); card.appendChild(t);
+  } else card.appendChild(el("div",{class:"empty"},"No card on file yet. Add one below."));
+  v.appendChild(card);
+
+  const add=el("div",{class:"card",style:"margin-top:16px"});
+  add.appendChild(el("div",{class:"eyebrow"},"Add a card"));
+  const num=el("input",{class:"mono",placeholder:"4242 4242 4242 4242",value:"4242424242424242"});
+  const exp=el("input",{class:"mono",placeholder:"MM/YY",value:"12/29"});
+  const cvv=el("input",{class:"mono",placeholder:"CVC",value:"123"});
+  add.appendChild(grid2(fld("Card number",num),fld("Expiry",exp),fld("CVC",cvv)));
+  add.appendChild(el("div",{class:"row"},
+    el("button",{class:"btn primary",onclick:async()=>{
+      try{ await api("/customers/payment-methods",{method:"POST",body:{card_number:num.value,exp:exp.value,cvv:cvv.value,make_default:true,consent:true}});
+        toast("Card saved","ok"); VIEWS.pay(); }catch(e){ toast(e.message,"err"); }
+    }},"Save card"),
+    el("span",{class:"hint"},"By saving you consent to storing this card for future fuel payments.")));
+  v.appendChild(add);
+};
+
+/* ---- Vehicles -------------------------------------------------------- */
+VIEWS.vehicles = async function(){
+  const canEdit = ["retailer_admin","forecourt_manager"].includes(state.role);
+  setView(header("Garage","Vehicles",
+    "Vehicles carry a status flag (a stolen flag blocks fuelling), an optional wallet, and coupons.",
+    canEdit?[el("button",{class:"btn primary",onclick:openVehicleForm},"Add vehicle")]:null));
+  const v=$("#view");
+  const rows = await safe(()=>api("/vehicles"), []);
+  const card=el("div",{class:"card"});
+  if(!rows.length){ card.appendChild(el("div",{class:"empty"},"No vehicles in scope.")); }
+  else{
+    const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},
+      el("th",{},"Plate"),el("th",{},"Nickname"),el("th",{},"Type"),el("th",{},"Status"),
+      el("th",{class:"num"},"Wallet"),canEdit?el("th",{},""):"")));
+    const tb=el("tbody",{});
+    rows.forEach(x=>tb.appendChild(el("tr",{},
+      el("td",{class:"num"},x.plate),el("td",{},x.nickname||"—"),
+      el("td",{},x.type.toUpperCase()),el("td",{html:statePill(x.flag)}),
+      el("td",{class:"num"},money(x.wallet_balance)),
+      canEdit?el("td",{},el("button",{class:"btn danger sm",onclick:async()=>{
+        try{await api("/vehicles/"+x.id,{method:"DELETE"});toast("Vehicle removed","ok");VIEWS.vehicles();}catch(e){toast(e.message,"err");}
+      }},"Delete")):"")));
+    t.appendChild(tb); card.appendChild(t);
+  }
+  v.appendChild(card);
+};
+function openVehicleForm(){
+  const v=$("#view");
+  const f=el("div",{class:"card",style:"margin-top:16px"});
+  f.appendChild(el("div",{class:"eyebrow"},"New vehicle"));
+  const plate=el("input",{class:"mono",placeholder:"ABC123GP"});
+  const nick=el("input",{placeholder:"nickname"});
+  const type=seg(["fuel","ev"],"fuel");
+  const flag=seg(["ok","stolen"],"ok");
+  const wallet=el("input",{class:"mono",type:"number",value:"0",step:"0.01"});
+  f.appendChild(grid2(fld("Plate",plate),fld("Nickname",nick),fld("Type",type.node),
+    fld("Status",flag.node),fld("Wallet (R)",wallet)));
+  f.appendChild(el("button",{class:"btn primary",onclick:async()=>{
+    try{ await api("/vehicles",{method:"POST",body:{plate:plate.value,nickname:nick.value,type:type.value(),flag:flag.value(),wallet_balance:String(wallet.value),coupons:[]}});
+      toast("Vehicle saved","ok"); VIEWS.vehicles(); }catch(e){ toast(e.message,"err"); }
+  }},"Save vehicle"));
+  v.appendChild(f);
+};
+
+/* ---- Logbook --------------------------------------------------------- */
+VIEWS.logbook = async function(){
+  const canExport = ["finance_audit","retailer_admin"].includes(state.role);
+  setView(header("Records","Logbook",
+    "Every completed transaction with its payment outcome, most recent first.",
+    canExport?[el("button",{class:"btn",onclick:exportCsv},"Export CSV")]:null));
+  const v=$("#view");
+  const rows = await safe(()=>api("/logbook"), []);
+  const card=el("div",{class:"card"});
+  if(!rows.length){ card.appendChild(el("div",{class:"empty"},"No transactions yet. Run a session to create one.")); }
+  else{
+    const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},
+      el("th",{},"Time"),el("th",{},"Plate"),el("th",{},"Mode"),
+      el("th",{class:"num"},"Units"),el("th",{class:"num"},"Price"),
+      el("th",{class:"num"},"Total"),el("th",{},"Outcome"))));
+    const tb=el("tbody",{});
+    rows.forEach(r=>tb.appendChild(el("tr",{},
+      el("td",{},new Date(r.ts).toLocaleString()),el("td",{class:"num"},r.plate||"—"),
+      el("td",{},r.mode.toUpperCase()),el("td",{class:"num"},Number(r.units).toFixed(2)+" "+r.unit_type),
+      el("td",{class:"num"},money(r.price_per_unit)),el("td",{class:"num"},money(r.total)),
+      el("td",{html:statePill(r.payment_outcome)}))));
+    t.appendChild(tb); card.appendChild(t);
+  }
+  v.appendChild(card);
+};
+async function exportCsv(){
+  try{ const res=await fetch(API+"/logbook/export",{headers:{Authorization:"Bearer "+state.token}});
+    const blob=await res.blob(); const u=URL.createObjectURL(blob);
+    const a=el("a",{href:u,download:"petro_logbook.csv"}); document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(u);
+  }catch(e){ toast("Export failed","err"); }
+}
+
+/* ---- Settlement ------------------------------------------------------ */
+VIEWS.settlement = async function(){
+  setView(header("Money","Settlement",
+    "Reconcile captured payments against dispensed fuel per forecourt. Net = gross − provider fees.",
+    [el("button",{class:"btn primary",onclick:async()=>{
+      try{ await api("/settlements/run",{method:"POST"}); toast("Reconciliation run","ok"); VIEWS.settlement(); }catch(e){ toast(e.message,"err"); }
+    }},"Run reconciliation")]));
+  const v=$("#view");
+  const rows = await safe(()=>api("/settlements"), []);
+  const card=el("div",{class:"card"});
+  card.appendChild(el("div",{class:"eyebrow"},"Per-forecourt, per-day"));
+  if(!rows.length){ card.appendChild(el("div",{class:"empty"},"No settlement rows. Capture a payment, then run reconciliation.")); }
+  else{
+    const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},
+      el("th",{},"Forecourt"),el("th",{},"Period"),el("th",{class:"num"},"Gross"),
+      el("th",{class:"num"},"Fees"),el("th",{class:"num"},"Net"),el("th",{},"Status"))));
+    const tb=el("tbody",{});
+    rows.forEach(s=>tb.appendChild(el("tr",{},
+      el("td",{class:"num"},"#"+s.forecourt_id),el("td",{},s.period),
+      el("td",{class:"num"},money(s.gross)),el("td",{class:"num"},money(s.fees)),
+      el("td",{class:"num",style:"color:var(--green)"},money(s.net)),el("td",{html:statePill(s.status)}))));
+    t.appendChild(tb); card.appendChild(t);
+  }
+  v.appendChild(card);
+
+  const ex = await safe(()=>api("/settlements/exceptions"), []);
+  const exc=el("div",{class:"card",style:"margin-top:16px"});
+  exc.appendChild(el("div",{class:"eyebrow"},"Exceptions · dispensed without matching capture"));
+  if(!ex.length){ exc.appendChild(el("div",{class:"empty"},"No exceptions — every dispensed session is matched to a capture.")); }
+  else{ const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},el("th",{},"Session"),el("th",{class:"num"},"Dispensed"))));
+    const tb=el("tbody",{}); ex.forEach(s=>tb.appendChild(el("tr",{},el("td",{},el("code",{class:"k"},s.session_ref)),el("td",{class:"num"},s.dispensed)))); t.appendChild(tb); exc.appendChild(t); }
+  v.appendChild(exc);
+};
+
+/* ---- Tenancy: retailers, forecourts, pumps -------------------------- */
+VIEWS.tenancy = async function(){
+  const v=$("#view");
+  if(state.role==="platform_admin"){
+    setView(header("Platform","Retailers",
+      "Enable or suspend fuel retailers. A suspended retailer's users cannot operate.",
+      [el("button",{class:"btn primary",onclick:async()=>{
+        const name=prompt("New retailer name"); if(!name)return;
+        try{ await api("/admin/retailers",{method:"POST",body:{name}}); toast("Retailer created","ok"); VIEWS.tenancy(); }catch(e){toast(e.message,"err");}
+      }},"Add retailer")]));
+    const rows = await safe(()=>api("/admin/retailers"), []);
+    const card=el("div",{class:"card"});
+    const t=el("table",{}); t.appendChild(el("thead",{},el("tr",{},el("th",{},"Retailer"),el("th",{},"Status"),el("th",{},""))));
+    const tb=el("tbody",{});
+    rows.forEach(r=>{
+      const next = r.status==="active"?"suspended":"active";
+      tb.appendChild(el("tr",{},el("td",{},r.name),el("td",{html:statePill(r.status)}),
+        el("td",{},el("button",{class:"btn sm",onclick:async()=>{
+          try{ await api("/admin/retailers/"+r.id,{method:"PATCH",body:{status:next}}); toast("Retailer "+next,"ok"); VIEWS.tenancy(); }catch(e){toast(e.message,"err");}
+        }}, r.status==="active"?"Suspend":"Enable"))));
+    });
+    t.appendChild(tb); card.appendChild(t); v.appendChild(card);
+    return;
+  }
+  // retailer admin / forecourt manager: create forecourts + pumps
+  setView(header("Network","Forecourts & pumps",
+    "Add a forecourt to your retailer, then register pumps. Each pump gets a webhook secret to configure its POS controller."));
+  const fcCard=el("div",{class:"card"});
+  fcCard.appendChild(el("div",{class:"eyebrow"},"New forecourt"));
+  const fname=el("input",{placeholder:"ACME N1 Plaza"});
+  const fcode=el("input",{class:"mono",placeholder:"N1-001"});
+  fcCard.appendChild(grid2(fld("Name",fname),fld("Site code",fcode)));
+  fcCard.appendChild(el("button",{class:"btn primary",onclick:async()=>{
+    try{ const r=await api("/forecourts",{method:"POST",body:{name:fname.value,site_code:fcode.value}});
+      toast("Forecourt #"+r.id+" created","ok"); }catch(e){ toast(e.message,"err"); }
+  }},"Create forecourt"));
+  v.appendChild(fcCard);
+
+  const pCard=el("div",{class:"card",style:"margin-top:16px"});
+  pCard.appendChild(el("div",{class:"eyebrow"},"Register pump"));
+  const fid=el("input",{class:"mono",type:"number",placeholder:"forecourt id",value:"1"});
+  const plabel=el("input",{placeholder:"Pump 3"});
+  const pmode=seg(["fuel","ev"],"fuel");
+  pCard.appendChild(grid2(fld("Forecourt id",fid),fld("Label",plabel),fld("Mode",pmode.node)));
+  pCard.appendChild(el("button",{class:"btn primary",onclick:async()=>{
+    try{ const r=await api(`/forecourts/${fid.value}/pumps`,{method:"POST",body:{label:plabel.value,mode:pmode.value()}});
+      toast("Pump #"+r.id+" registered","ok");
+      pCard.appendChild(el("p",{class:"hint",style:"margin-top:10px"},"Webhook secret for this pump's POS: "));
+      pCard.appendChild(el("code",{class:"k"},r.webhook_secret));
+    }catch(e){ toast(e.message,"err"); }
+  }},"Register pump"));
+  v.appendChild(pCard);
+};
+
+/* ============================================================ small ui utils */
+function fld(label,node){ const l=el("label",{class:"fld"},el("span",{},label)); l.appendChild(node); return l; }
+function grid2(...kids){ return el("div",{class:"grid cols-2"},...kids); }
+function seg(opts,initial){ let cur=initial; const node=el("div",{class:"seg"});
+  const btns=opts.map(o=>el("button",{class:o===cur?"on":"",onclick:()=>{cur=o;btns.forEach((b,i)=>b.className=opts[i]===cur?"on":"");}},o.toUpperCase()));
+  btns.forEach(b=>node.appendChild(b)); return {node, value:()=>cur}; }
+async function safe(fn,fallback){ try{ return await fn(); }catch(e){ return fallback; } }
+
+/* ============================================================ boot */
+renderQuick();
+const saved = sessionStorage.getItem("petro");
+if(saved){ try{ Object.assign(state, JSON.parse(saved)); if(state.token) enterApp(); }catch{} }
+$("#password").addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+</script>
+</body>
+</html>

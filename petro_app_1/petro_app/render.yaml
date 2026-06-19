@@ -1,0 +1,31 @@
+# Render Blueprint — deploys the API + a managed PostgreSQL database.
+# Push this to your repo root, then in Render: New > Blueprint > pick the repo.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: petro-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free                # bump to 'starter' if the free instance sleeps too aggressively
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: petro-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true   # Render generates a strong random secret
+      - key: PSP_WEBHOOK_SECRET
+        generateValue: true
+      - key: CURRENCY
+        value: ZAR
+      # Demo/staging: seed sample data and expose the console's pump helper.
+      # Set to "0" for a real production deployment.
+      - key: SEED_ON_STARTUP
+        value: "1"
+
+databases:
+  - name: petro-db
+    plan: free
+    databaseName: petro
+    user: petro
